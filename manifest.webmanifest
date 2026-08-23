@@ -1,11 +1,11 @@
 {
-  "name": "Ridge Lift",
-  "short_name": "Ridge Lift",
-  "description": "Feel the air. Ride the ridge.",
+  "name": "STARSHIP \u00b7 LANDING",
+  "short_name": "Starship",
+  "description": "Kill the speed. Hit the steel.",
   "display": "standalone",
-  "orientation": "landscape-primary",
-  "theme_color": "#071018",
-  "background_color": "#071018",
+  "orientation": "any",
+  "theme_color": "#0c0a10",
+  "background_color": "#0c0a10",
   "start_url": "./",
   "scope": "./"
 }
