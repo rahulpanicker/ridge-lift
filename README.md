@@ -1,2 +1,5 @@
-# ridge-lift
-Ridge Lift — 3D ridge-soaring flight game, playable on phone
+# Ridge Lift
+
+Play on your phone. Tilt to fly. Throttle is on the right.
+
+**Play:** https://rahulpanicker.github.io/ridge-lift/

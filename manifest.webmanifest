@@ -1,0 +1,11 @@
+{
+  "name": "Ridge Lift",
+  "short_name": "Ridge Lift",
+  "description": "Feel the air. Ride the ridge.",
+  "display": "standalone",
+  "orientation": "landscape-primary",
+  "theme_color": "#071018",
+  "background_color": "#071018",
+  "start_url": "./",
+  "scope": "./"
+}
