@@ -15,10 +15,10 @@
   var ISP_VAC = 350;
   var AREA = 180;
   var CD_AX = 1.6;
-  var CD_BELLY = 3.2;
+  var CD_BELLY = 4.4;
   var RHO0 = 1.225;
   var HSCALE = 8500;
-  var MAX_TILT = 22 * Math.PI / 180;
+  var MAX_TILT = 28 * Math.PI / 180;
   var PAD_R = 42;
   var LEGS = 24;
   var SHIP_R = 4.5;
@@ -47,7 +47,7 @@
     fuel: PROP0, mass: DRY + PROP0, lit: false
   };
   var targetTiltX = 0, targetTiltZ = 0;
-  var crashT = 0, settle = 0, flash = 0;
+  var crashT = 0, settle = 0, flash = 0, contactGrace = 0;
   var last = { vs: 0, hs: 0, tilt: 0, fuel: PROP0, contact: 0, twr: 0, alt: START_ALT };
 
   var touchOn = false;
@@ -80,8 +80,8 @@
 
   function buildStarship() {
     var g = new THREE.Group();
-    var steel = steelMat(0xc7cad0, 0.24, 0.94);
-    var steelDark = steelMat(0x9aa0a6, 0.34, 0.9);
+    var steel = steelMat(0xdde1e6, 0.18, 0.85);
+    var steelDark = steelMat(0xb8bcc4, 0.28, 0.82);
     var ringM = steelMat(0x8b9096, 0.4, 0.88);
     var tile = steelMat(0x1a1c20, 0.55, 0.35);
     var copper = steelMat(0xb87333, 0.35, 0.85);
@@ -174,36 +174,86 @@
 
   function buildWorld() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1424);
-    scene.fog = new THREE.FogExp2(0x1a1424, 0.00055);
-    var skyGeo = new THREE.SphereGeometry(3800, 32, 16);
-    var skyMat = new THREE.MeshBasicMaterial({ color: 0x24182c, side: THREE.BackSide, fog: false });
-    var sky = new THREE.Mesh(skyGeo, skyMat);
+    scene.background = new THREE.Color(0x6a8498);
+    scene.fog = new THREE.Fog(0x8aa0b4, 400, 5000);
+    var skyMat = new THREE.ShaderMaterial({
+      uniforms: {
+        topColor: { value: new THREE.Color(0x4a7aaa) },
+        horizonColor: { value: new THREE.Color(0xe0c8a0) },
+        bottomColor: { value: new THREE.Color(0x2a3840) }
+      },
+      vertexShader: [
+        "varying vec3 vWorldPos;",
+        "void main() {",
+        "  vec4 wp = modelMatrix * vec4(position, 1.0);",
+        "  vWorldPos = wp.xyz;",
+        "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "uniform vec3 topColor;",
+        "uniform vec3 horizonColor;",
+        "uniform vec3 bottomColor;",
+        "varying vec3 vWorldPos;",
+        "void main() {",
+        "  float h = normalize(vWorldPos).y;",
+        "  vec3 col = (h > 0.0)",
+        "    ? mix(horizonColor, topColor, pow(clamp(h, 0.0, 1.0), 0.65))",
+        "    : mix(horizonColor, bottomColor, pow(clamp(-h, 0.0, 1.0), 0.85));",
+        "  gl_FragColor = vec4(col, 1.0);",
+        "}"
+      ].join("\n"),
+      side: THREE.BackSide,
+      fog: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    var sky = new THREE.Mesh(new THREE.SphereGeometry(4200, 32, 16), skyMat);
     scene.add(sky);
-    var dusk = new THREE.Mesh(
-      new THREE.SphereGeometry(3700, 32, 12, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.2),
-      new THREE.MeshBasicMaterial({ color: 0xc46a3a, side: THREE.BackSide, transparent: true, opacity: 0.22, fog: false })
-    );
-    scene.add(dusk);
 
-    var hemi = new THREE.HemisphereLight(0xc4a078, 0x0a1218, 0.55);
+    var sunDir = new THREE.Vector3(200, 280, 80).normalize();
+    var sunDisc = new THREE.Mesh(
+      new THREE.SphereGeometry(110, 20, 14),
+      new THREE.MeshBasicMaterial({ color: 0xffe8b8, fog: false, toneMapped: false })
+    );
+    sunDisc.position.copy(sunDir.clone().multiplyScalar(3400));
+    scene.add(sunDisc);
+    var sunGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(220, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffd090, transparent: true, opacity: 0.32, fog: false, depthWrite: false, toneMapped: false })
+    );
+    sunGlow.position.copy(sunDisc.position);
+    scene.add(sunGlow);
+
+    var hemi = new THREE.HemisphereLight(0xc8d8ee, 0x3a4038, 1.1);
     scene.add(hemi);
-    sun = new THREE.DirectionalLight(0xffb070, 1.35);
-    sun.position.set(-180, 90, -120);
+    sun = new THREE.DirectionalLight(0xffe2b0, 2.2);
+    sun.position.set(200, 280, 80);
     scene.add(sun);
-    scene.add(new THREE.AmbientLight(0x2a2430, 0.35));
+    var fill = new THREE.DirectionalLight(0xb0c4d8, 0.45);
+    fill.position.set(-180, 90, -70);
+    scene.add(fill);
+    scene.add(new THREE.AmbientLight(0x8899aa, 0.55));
 
     ocean = new THREE.Mesh(
       new THREE.PlaneGeometry(8000, 8000),
-      new THREE.MeshStandardMaterial({ color: 0x0b1a22, metalness: 0.35, roughness: 0.55 })
+      new THREE.MeshStandardMaterial({ color: 0x1a3a48, metalness: 0.22, roughness: 0.35 })
     );
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.y = -0.4;
     scene.add(ocean);
 
+    var shallows = new THREE.Mesh(
+      new THREE.RingGeometry(260, 780, 48),
+      new THREE.MeshStandardMaterial({ color: 0x2a5a58, roughness: 0.4, metalness: 0.18 })
+    );
+    shallows.rotation.x = -Math.PI / 2;
+    shallows.position.y = -0.28;
+    scene.add(shallows);
+
     var flat = new THREE.Mesh(
       new THREE.CircleGeometry(280, 48),
-      new THREE.MeshStandardMaterial({ color: 0x3a3428, roughness: 0.92, metalness: 0.05 })
+      new THREE.MeshStandardMaterial({ color: 0x6a6458, roughness: 0.88, metalness: 0.08 })
     );
     flat.rotation.x = -Math.PI / 2;
     flat.position.y = -0.15;
@@ -212,37 +262,37 @@
     padGroup = new THREE.Group();
     var pad = new THREE.Mesh(
       new THREE.CircleGeometry(PAD_R, 48),
-      new THREE.MeshStandardMaterial({ color: 0x6a6864, roughness: 0.85, metalness: 0.1 })
+      new THREE.MeshStandardMaterial({ color: 0x8a8680, roughness: 0.72, metalness: 0.12 })
     );
     pad.rotation.x = -Math.PI / 2;
     pad.position.y = 0.05;
     padGroup.add(pad);
     var ring = new THREE.Mesh(
-      new THREE.RingGeometry(PAD_R - 1.2, PAD_R, 48),
-      new THREE.MeshBasicMaterial({ color: 0xd8d0c0, side: THREE.DoubleSide })
+      new THREE.RingGeometry(PAD_R - 1.4, PAD_R, 48),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.08;
     padGroup.add(ring);
     var inner = new THREE.Mesh(
-      new THREE.RingGeometry(18, 19.2, 40),
-      new THREE.MeshBasicMaterial({ color: 0xc8c0b0, side: THREE.DoubleSide })
+      new THREE.RingGeometry(18, 19.4, 40),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
     );
     inner.rotation.x = -Math.PI / 2;
     inner.position.y = 0.09;
     padGroup.add(inner);
     function stripe(w, h, x, z) {
-      var s = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: 0xe8e0d0 }));
+      var s = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: 0xffffff }));
       s.rotation.x = -Math.PI / 2;
       s.position.set(x, 0.1, z);
       padGroup.add(s);
     }
-    stripe(2.2, PAD_R * 1.7, 0, 0);
-    stripe(PAD_R * 1.7, 2.2, 0, 0);
+    stripe(3.6, PAD_R * 1.9, 0, 0);
+    stripe(PAD_R * 1.9, 3.6, 0, 0);
     scene.add(padGroup);
 
     tower = new THREE.Group();
-    var dark = steelMat(0x1c1e22, 0.6, 0.4);
+    var dark = steelMat(0x3a4048, 0.55, 0.45);
     var mast = new THREE.Mesh(new THREE.BoxGeometry(6, 146, 8), dark);
     mast.position.set(-78, 73, -36);
     tower.add(mast);
@@ -260,7 +310,7 @@
     for (var k = 0; k < 9; k++) {
       var pile = new THREE.Mesh(
         new THREE.BoxGeometry(4 + Math.random() * 8, 2 + Math.random() * 4, 6 + Math.random() * 10),
-        steelMat(0x2a2620, 0.85, 0.1)
+        steelMat(0x4a463c, 0.82, 0.12)
       );
       var ang = k * 0.7 + 1;
       pile.position.set(Math.cos(ang) * (160 + k * 30), 1, Math.sin(ang) * (140 + k * 24) - 40);
@@ -269,7 +319,7 @@
 
     shadowDisc = new THREE.Mesh(
       new THREE.CircleGeometry(5, 20),
-      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28 })
     );
     shadowDisc.rotation.x = -Math.PI / 2;
     shadowDisc.position.y = 0.12;
@@ -277,7 +327,7 @@
 
     impactPip = new THREE.Mesh(
       new THREE.RingGeometry(3.2, 4.1, 20),
-      new THREE.MeshBasicMaterial({ color: 0xe8a23a, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+      new THREE.MeshBasicMaterial({ color: 0xe8a23a, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
     );
     impactPip.rotation.x = -Math.PI / 2;
     impactPip.position.y = 0.14;
@@ -286,12 +336,12 @@
     ship = buildStarship();
     scene.add(ship);
 
-    exhaustLight = new THREE.PointLight(0xff9940, 0, 220, 1.6);
+    exhaustLight = new THREE.PointLight(0xffc070, 0, 320, 1.35);
     scene.add(exhaustLight);
     flashLight = new THREE.PointLight(0xffeeaa, 0, 400, 1.2);
     scene.add(flashLight);
 
-    camera = new THREE.PerspectiveCamera(52, 1, 0.5, 8000);
+    camera = new THREE.PerspectiveCamera(54, 1, 0.5, 9000);
     camera.position.set(30, 40, -120);
   }
 
@@ -302,7 +352,7 @@
     st.fuel = PROP0; st.mass = DRY + PROP0; st.lit = false;
     ac.throttle = 0; ac.pitch = 0; ac.yaw = 0;
     targetTiltX = 0; targetTiltZ = 0;
-    crashT = 0; settle = 0; flash = 0;
+    crashT = 0; settle = 0; flash = 0; contactGrace = 0;
     ship.scale.set(1, 1, 1);
     ship.rotation.set(0, 0, 0);
     ship.visible = true;
@@ -383,17 +433,17 @@
     st.mass = massNow();
 
     var I = st.mass * 180;
-    var kP = 220000 * st.mass / 200000;
-    var kD = 90000 * st.mass / 200000;
-    var boost = 0.45 + throttleEff() * 1.1;
+    var kP = 352000 * st.mass / 200000;
+    var kD = 144000 * st.mass / 200000;
+    var boost = 0.72 + throttleEff() * 1.35;
     var tx = ((targetTiltX - st.tiltX) * kP - st.wx * kD) * boost;
     var tz = ((targetTiltZ - st.tiltZ) * kP - st.wz * kD) * boost;
     st.wx += tx / I * dt;
     st.wz += tz / I * dt;
-    st.wx *= 0.992;
-    st.wz *= 0.992;
-    st.tiltX = clamp(st.tiltX + st.wx * dt, -0.7, 0.7);
-    st.tiltZ = clamp(st.tiltZ + st.wz * dt, -0.7, 0.7);
+    st.wx *= 0.988;
+    st.wz *= 0.988;
+    st.tiltX = clamp(st.tiltX + st.wx * dt, -MAX_TILT, MAX_TILT);
+    st.tiltZ = clamp(st.tiltZ + st.wz * dt, -MAX_TILT, MAX_TILT);
 
     var te = throttleEff();
     var alt = Math.max(0, st.y - LEGS);
@@ -415,14 +465,15 @@
     ux /= un; uy /= un; uz /= un;
 
     var ax = 0, ay = -G0, az = 0;
-    ax += ux * thrust / st.mass;
+    var couple = 1.28;
+    ax += ux * thrust / st.mass * couple;
     ay += uy * thrust / st.mass;
-    az += uz * thrust / st.mass;
+    az += uz * thrust / st.mass * couple;
 
     var spd = Math.sqrt(st.vx * st.vx + st.vy * st.vy + st.vz * st.vz);
     var tiltAng = Math.acos(clamp(uy, -1, 1));
     var cd = CD_AX + (CD_BELLY - CD_AX) * Math.abs(Math.sin(tiltAng));
-    var area = AREA * (1 + 0.7 * Math.abs(Math.sin(tiltAng)));
+    var area = AREA * (1 + 1.05 * Math.abs(Math.sin(tiltAng)));
     if (spd > 0.2) {
       var fd = 0.5 * rho * spd * spd * cd * area;
       ax -= (st.vx / spd) * fd / st.mass;
@@ -447,23 +498,44 @@
 
     if (st.y <= LEGS) {
       st.y = LEGS;
-      contact();
+      if (st.vy < 0) st.vy += Math.min(-st.vy, 18 * dt);
+      st.vx *= Math.pow(0.22, dt);
+      st.vz *= Math.pow(0.22, dt);
+      contact(dt);
+    } else {
+      contactGrace = 0;
     }
   }
 
-  function contact() {
+  function contact(dt) {
     if (phase !== "fly") return;
     var hs = hypot2(st.vx, st.vz);
     var vs = st.vy;
     var tilt = last.tilt;
     var r = hypot2(st.x, st.z);
     var onPad = r <= PAD_R;
-    var soft = onPad && Math.abs(vs) < 4 && hs < 3 && tilt < 8;
-    last.contact = Math.sqrt(hs * hs + vs * vs);
-    last.hs = hs;
-    last.vs = vs;
-    if (soft) succeed();
-    else fail(onPad, vs, hs, tilt, r);
+    if (contactGrace <= 0) {
+      last.contact = Math.sqrt(hs * hs + vs * vs);
+      last.hs = hs;
+      last.vs = vs;
+    }
+    var firstSoft = onPad && Math.abs(last.vs) < 4 && last.hs < 3 && tilt < 8;
+    var nowSoft = onPad && Math.abs(vs) < 4 && hs < 3 && tilt < 8;
+    if (firstSoft || nowSoft) {
+      if (nowSoft) {
+        last.hs = hs;
+        last.vs = vs;
+        last.contact = Math.sqrt(hs * hs + vs * vs);
+      }
+      succeed();
+      return;
+    }
+    contactGrace += dt || 0.016;
+    if (!onPad || Math.abs(last.vs) > 14 || last.hs > 12 || tilt > 28) {
+      fail(onPad, last.vs, last.hs, tilt, r);
+      return;
+    }
+    if (contactGrace >= 0.15) fail(onPad, last.vs, last.hs, tilt, r);
   }
 
   function succeed() {
@@ -499,7 +571,7 @@
     document.getElementById("endTitle").textContent = title;
     document.getElementById("endTag").textContent = tag;
     document.getElementById("eV").textContent = last.contact.toFixed(1) + " m/s";
-    document.getElementById("eTilt").textContent = last.tilt.toFixed(1) + "\u00b0";
+    document.getElementById("eTilt").textContent = last.tilt.toFixed(1) + "°";
     document.getElementById("eFuel").textContent = (last.fuel / 1000).toFixed(1) + " t";
     document.getElementById("end").classList.add("show");
     document.getElementById("bestV").textContent = fmtBest(loadBest());
@@ -552,8 +624,8 @@
       var p = plumes[i];
       if (te > 0.05) {
         p.visible = true;
-        p.scale.set(0.7 + te * 0.7, 0.45 + te * 1.35, 0.7 + te * 0.7);
-        p.material.opacity = 0.18 + te * 0.55;
+        p.scale.set(0.85 + te * 0.9, 0.55 + te * 1.7, 0.85 + te * 0.9);
+        p.material.opacity = 0.32 + te * 0.72;
         p.material.color.setHSL(0.08 - te * 0.02, 1, 0.55 + te * 0.15);
       } else {
         p.visible = false;
@@ -561,7 +633,7 @@
       }
     }
     exhaustLight.position.set(st.x, 4, st.z);
-    exhaustLight.intensity = te * 55;
+    exhaustLight.intensity = te * 110;
     flashLight.position.set(st.x, 10, st.z);
     flashLight.intensity = flash * 80;
     shadowDisc.position.x = st.x;
@@ -575,12 +647,12 @@
   }
 
   function syncCam() {
-    var back = 92 + clamp(last.alt * 0.02, 0, 40);
-    var below = -6;
-    var desired = new THREE.Vector3(st.x + st.tiltZ * 18, st.y + below, st.z - back);
-    if (phase === "crash") desired.set(st.x - 30, 22, st.z - 50);
+    var back = 96 + clamp(last.alt * 0.018, 0, 36);
+    var below = 8;
+    var desired = new THREE.Vector3(st.x + st.tiltZ * 16, st.y + below, st.z - back);
+    if (phase === "crash") desired.set(st.x - 30, 28, st.z - 50);
     camera.position.lerp(desired, phase === "menu" ? 1 : 0.08);
-    camera.lookAt(st.x, st.y + 10, st.z);
+    camera.lookAt(st.x, st.y + 2, st.z);
   }
 
   function hud() {
@@ -977,8 +1049,12 @@
   function boot() {
     try {
       renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
-      renderer.setClearColor(0x1a1424, 1);
+      renderer.setClearColor(0x6a8498, 1);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      if ("physicallyCorrectLights" in renderer) renderer.physicallyCorrectLights = true;
+      if ("useLegacyLights" in renderer) renderer.useLegacyLights = false;
     } catch (e) {
       var fl = document.getElementById("fail");
       fl.style.display = "flex";
