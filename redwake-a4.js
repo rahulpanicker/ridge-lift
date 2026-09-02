@@ -1,3 +1,78 @@
+      pos[i * 3 + 1] = Math.random() * 12 + 1;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 400;
+    }
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    var mat = new THREE.PointsMaterial({ color: 0xf0d8a8, size: 2.2, transparent: true, opacity: 0.32, depthAttenuation: true });
+    var pts = new THREE.Points(geo, mat);
+    scene.add(pts);
+    dust.push(pts);
+  })();
+
+  function placeGrid() {
+    player.resetAt(2, 0);
+    ai1.resetAt(0, -5);
+    ai2.resetAt(0, 5);
+  }
+  placeGrid();
+
+  function startRace() {
+    startOv.classList.add("hidden");
+    endOv.classList.add("hidden");
+    placeGrid();
+    state = "countdown";
+    countdown = 3.2;
+    raceTime = 0;
+    elMsg.textContent = "3";
+    setRailVisual("L", 0); setRailVisual("R", 0);
+    unlockAudio();
+  }
+  function retryRace() { startRace(); }
+  window.startRace = startRace;
+  window.retryRace = retryRace;
+  var btnStart = document.getElementById("btnStart");
+  var btnRetry = document.getElementById("btnRetry");
+  var btnRestart = document.getElementById("btnRestart");
+  if (btnStart) btnStart.addEventListener("click", startRace);
+  if (btnRetry) btnRetry.addEventListener("click", retryRace);
+  if (btnRestart) btnRestart.addEventListener("click", startRace);
+
+  function finishRace(dnf) {
+    state = "done";
+    endOv.classList.remove("hidden");
+    if (dnf || !player.alive) {
+      endKick.textContent = "DNF";
+      endTitle.textContent = "WRECKED";
+      endResult.textContent = "Hard wall hit. Differential discipline next time.";
+    } else {
+      var place = getPlace(player);
+      endKick.textContent = "FINISH";
+      endTitle.textContent = place === 1 ? "1ST" : place === 2 ? "2ND" : "3RD";
+      endResult.textContent = "Time " + raceTime.toFixed(2) + "s · Lap best stored locally.";
+      try {
+        var best = parseFloat(localStorage.getItem("redwakeBest") || "9999");
+        if (raceTime < best) localStorage.setItem("redwakeBest", String(raceTime.toFixed(2)));
+      } catch (err) {}
+    }
+    elMsg.textContent = "";
+  }
+
+  function getPlace(pod) {
+    var better = 0;
+    for (var i = 0; i < pods.length; i++) {
+      if (pods[i] === pod) continue;
+      if (pods[i].finished && !pod.finished) { better++; continue; }
+      if (pods[i].raceProg > pod.raceProg) better++;
+    }
+    return better + 1;
+  }
+
+  // AI: follow centerline with mild differential
+  function updateAI(pod, dt) {
+    if (!pod.alive || pod.finished || state !== "racing") return;
+    var ti = nearestTrack(pod.pos);
+    var look = centerline[Math.min(NSEG, ti + 8)];
+    var to = look.clone().sub(pod.pos);
+    to.y = 0;
     var desiredYaw = Math.atan2(to.x, to.z);
     var err = desiredYaw - pod.yaw;
     while (err > Math.PI) err -= Math.PI * 2;
