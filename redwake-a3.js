@@ -1,3 +1,62 @@
+      this.yawRate += (this.spoolL - this.spoolR) * 2.8 * dt;
+      // tether stretch dump speed
+      this.vel.multiplyScalar(Math.max(0.92, 1 - split * 0.04));
+    }
+    this.yaw += this.yawRate * dt;
+
+    // engine spring-damper offsets (scissor visual + feel)
+    var restL = -TETHER_LEN, restR = TETHER_LEN;
+    // stretch from yaw rate / split
+    var stretch = split * (0.8 + Math.abs(this.yawRate) * 0.5);
+    var targetL = restL - stretch * Math.sign(this.spoolL - this.spoolR + 0.0001) * 0.5;
+    var targetR = restR + stretch * Math.sign(this.spoolL - this.spoolR + 0.0001) * 0.5;
+    // spring on lateral offset
+    var aL = (-TETHER_K * (this.engOffsetL.x - targetL) - TETHER_D * this.engVelL.x) / MASS_ENGINE;
+    var aR = (-TETHER_K * (this.engOffsetR.x - targetR) - TETHER_D * this.engVelR.x) / MASS_ENGINE;
+    this.engVelL.x += aL * dt; this.engVelR.x += aR * dt;
+    this.engOffsetL.x += this.engVelL.x * dt; this.engOffsetR.x += this.engVelR.x * dt;
+    this.engOffsetL.x = THREE.MathUtils.clamp(this.engOffsetL.x, -TETHER_LEN * 1.45, -TETHER_LEN * 0.55);
+    this.engOffsetR.x = THREE.MathUtils.clamp(this.engOffsetR.x, TETHER_LEN * 0.55, TETHER_LEN * 1.45);
+
+    this.pos.addScaledVector(this.vel, dt);
+
+    // ground-effect hover
+    var ti = nearestTrack(this.pos);
+    var groundY = centerline[ti].y + HOVER_H;
+    var dy = groundY - this.pos.y;
+    // allow jumps: if going up fast or above, soft spring only when near
+    if (this.pos.y < groundY + 6) {
+      var hoverAcc = dy * 18 - this.vel.y * 6;
+      if (this.pos.y > groundY + 1.5 && this.vel.y > 0) hoverAcc *= 0.15;
+      this.vel.y += hoverAcc * dt;
+    }
+    this.vel.y -= GRAV * 0.35 * dt; // light gravity so lips launch
+    if (this.pos.y < groundY - 0.2) {
+      this.pos.y = groundY;
+      if (this.vel.y < 0) this.vel.y *= -0.2;
+    }
+
+    // roll visual from yaw rate + diff
+    this.roll = THREE.MathUtils.clamp(-this.yawRate * 0.25 - (this.spoolL - this.spoolR) * 0.15, -0.55, 0.55);
+
+    // wall collision via centerline half-width
+    var c = centerline[ti];
+    var b = binormals[ti];
+    var local = this.pos.clone().sub(c);
+    var lat = local.dot(b);
+    var hw = widths[ti] - 2.2;
+    if (Math.abs(lat) > hw) {
+      var pen = Math.abs(lat) - hw;
+      var sign = lat > 0 ? 1 : -1;
+      this.pos.addScaledVector(b, -sign * pen);
+      // bounce
+      var vLat = this.vel.dot(b);
+      if (vLat * sign > 0) this.vel.addScaledVector(b, -vLat * 1.35);
+      this.vel.multiplyScalar(0.72);
+      this.yawRate += -sign * 1.5;
+      this.sparkT = 0.35;
+      this.heat = Math.min(1, this.heat + 0.08);
+      if (pen > 4 || this.vel.length() < 4 && pen > 1.5) {
         // hard hit DNF if slamming deep
         if (spd > 55 && pen > 3.5) {
           this.alive = false;
@@ -184,9 +243,9 @@
   }
 
   // ========== GAME STATE ==========
-  var player = new Pod({ isPlayer: true, name: "Redwake", color: 0xff3344, engColor: 0xff6622 });
-  var ai1 = new Pod({ name: "Saffron", color: 0x44aaff, engColor: 0x3388ff, soft: 1.15 });
-  var ai2 = new Pod({ name: "Cinder", color: 0x55dd66, engColor: 0x33aa44, soft: 1.2 });
+  var player = new Pod({ isPlayer: true, name: "Redwake", color: 0xff4422, engColor: 0xff7722 });
+  var ai1 = new Pod({ name: "Saffron", color: 0x33bbff, engColor: 0x22a0ff, soft: 1.15 });
+  var ai2 = new Pod({ name: "Cinder", color: 0x44ee55, engColor: 0x22cc44, soft: 1.2 });
   var pods = [player, ai1, ai2];
   var state = "title"; // title | countdown | racing | done
   var countdown = 0;
@@ -202,78 +261,3 @@
     var pos = new Float32Array(N * 3);
     for (var i = 0; i < N; i++) {
       pos[i * 3] = (Math.random() - 0.5) * 400;
-      pos[i * 3 + 1] = Math.random() * 12 + 1;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 400;
-    }
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    var mat = new THREE.PointsMaterial({ color: 0xe8c890, size: 1.2, transparent: true, opacity: 0.45, depthAttenuation: true });
-    var pts = new THREE.Points(geo, mat);
-    scene.add(pts);
-    dust.push(pts);
-  })();
-
-  function placeGrid() {
-    player.resetAt(2, 0);
-    ai1.resetAt(0, -5);
-    ai2.resetAt(0, 5);
-  }
-  placeGrid();
-
-  function startRace() {
-    startOv.classList.add("hidden");
-    endOv.classList.add("hidden");
-    placeGrid();
-    state = "countdown";
-    countdown = 3.2;
-    raceTime = 0;
-    elMsg.textContent = "3";
-    setRailVisual("L", 0); setRailVisual("R", 0);
-    unlockAudio();
-  }
-  function retryRace() { startRace(); }
-  window.startRace = startRace;
-  window.retryRace = retryRace;
-  var btnStart = document.getElementById("btnStart");
-  var btnRetry = document.getElementById("btnRetry");
-  var btnRestart = document.getElementById("btnRestart");
-  if (btnStart) btnStart.addEventListener("click", startRace);
-  if (btnRetry) btnRetry.addEventListener("click", retryRace);
-  if (btnRestart) btnRestart.addEventListener("click", startRace);
-
-  function finishRace(dnf) {
-    state = "done";
-    endOv.classList.remove("hidden");
-    if (dnf || !player.alive) {
-      endKick.textContent = "DNF";
-      endTitle.textContent = "WRECKED";
-      endResult.textContent = "Hard wall hit. Differential discipline next time.";
-    } else {
-      var place = getPlace(player);
-      endKick.textContent = "FINISH";
-      endTitle.textContent = place === 1 ? "1ST" : place === 2 ? "2ND" : "3RD";
-      endResult.textContent = "Time " + raceTime.toFixed(2) + "s · Lap best stored locally.";
-      try {
-        var best = parseFloat(localStorage.getItem("redwakeBest") || "9999");
-        if (raceTime < best) localStorage.setItem("redwakeBest", String(raceTime.toFixed(2)));
-      } catch (err) {}
-    }
-    elMsg.textContent = "";
-  }
-
-  function getPlace(pod) {
-    var better = 0;
-    for (var i = 0; i < pods.length; i++) {
-      if (pods[i] === pod) continue;
-      if (pods[i].finished && !pod.finished) { better++; continue; }
-      if (pods[i].raceProg > pod.raceProg) better++;
-    }
-    return better + 1;
-  }
-
-  // AI: follow centerline with mild differential
-  function updateAI(pod, dt) {
-    if (!pod.alive || pod.finished || state !== "racing") return;
-    var ti = nearestTrack(pod.pos);
-    var look = centerline[Math.min(NSEG, ti + 8)];
-    var to = look.clone().sub(pod.pos);
-    to.y = 0;
