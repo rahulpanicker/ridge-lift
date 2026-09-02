@@ -214,4 +214,70 @@
     var len = dir.length();
     mesh.position.copy(mid);
     mesh.scale.set(1, len, 1);
-    mesh.
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+    mesh.material.opacity = 0.75 + Math.min(0.25, Math.abs(len - TETHER_LEN) * 0.15);
+  }
+
+  Pod.prototype.step = function (dt) {
+    if (!this.alive || this.finished) { this.syncVisual(); return; }
+    var soft = this.soft;
+    // spool
+    var tgtL = this.throttleL, tgtR = this.throttleR;
+    // heat sag near 100%
+    var sag = this.heat > 0.85 ? (1 - (this.heat - 0.85) * 1.5) : 1;
+    sag = Math.max(0.35, sag);
+    var tau = SPOOL_TAU * soft;
+    this.spoolL += (tgtL * sag - this.spoolL) * (1 - Math.exp(-dt / tau));
+    this.spoolR += (tgtR * sag - this.spoolR) * (1 - Math.exp(-dt / tau));
+
+    var boostMul = 1;
+    if (this.boosting && this.boost > 0 && this.heat < 0.98) {
+      boostMul = BOOST_MULT;
+      this.boost = Math.max(0, this.boost - dt);
+      this.heat = Math.min(1, this.heat + HEAT_RATE * 1.4 * dt);
+      if (this.boost <= 0) this.boosting = false;
+    } else {
+      this.boosting = false;
+      this.boost = Math.min(BOOST_MAX, this.boost + dt * 0.35);
+    }
+    var thrustUse = (this.spoolL + this.spoolR) * 0.5;
+    this.heat = Math.min(1, Math.max(0, this.heat + (thrustUse > 0.85 ? HEAT_RATE : -COOL_RATE) * dt));
+
+    var fwd = this.forward();
+    var rgt = this.right();
+    var fL = this.spoolL * FMAX * boostMul / soft;
+    var fR = this.spoolR * FMAX * boostMul / soft;
+
+    // Forces on engines along forward; yaw from differential
+    // Convention: MORE LEFT thrust → turn RIGHT (engines push, left-heavy yaws CW when looking down = +yaw if yaw from +z toward +x)
+    var totalF = fL + fR;
+    var diff = fL - fR; // +diff => more left => yaw right (+)
+    var force = fwd.clone().multiplyScalar(totalF);
+
+    // drag
+    var spd = this.vel.length();
+    var sideslip = 0;
+    if (spd > 0.5) {
+      var vdir = this.vel.clone().normalize();
+      sideslip = 1 - Math.abs(vdir.dot(fwd));
+    }
+    var Cd = CD0 * (1 + 1.8 * sideslip + 0.6 * Math.abs(this.yawRate));
+    if (spd > 0.01) {
+      var dragMag = 0.5 * RHO * Cd * AREA * spd * spd;
+      force.add(this.vel.clone().normalize().multiplyScalar(-dragMag));
+    }
+
+    // mass = cockpit + engines coupled loosely
+    var mass = MASS_COCKPIT + MASS_ENGINE * 2;
+    var acc = force.multiplyScalar(1 / mass);
+    this.vel.addScaledVector(acc, dt);
+
+    // yaw dynamics from differential thrust + lever arm
+    var yawTorque = diff * TETHER_LEN * 0.55;
+    var I = MASS_ENGINE * TETHER_LEN * TETHER_LEN * 2 + MASS_COCKPIT * 1.5;
+    this.yawRate += (yawTorque / I) * dt;
+    // yaw damping
+    this.yawRate *= Math.exp(-1.8 * dt);
+    // low-speed scissor amplification when huge split
+    var split = Math.abs(this.spoolL - this.spoolR);
+    if (spd < 25 && split > 0.35) {
