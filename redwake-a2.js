@@ -1,1 +1,1 @@
-PLACEHOLDER_REPLACE
+@/tmp/a2_only_content.txt
