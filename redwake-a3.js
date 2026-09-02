@@ -205,8 +205,8 @@
       pos[i * 3 + 1] = Math.random() * 12 + 1;
       pos[i * 3 + 2] = (Math.random() - 0.5) * 400;
     }
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    var mat = new THREE.PointsMaterial({ color: 0xe8c890, size: 1.2, transparent: true, opacity: 0.45, sizeAttenuation: true });
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    var mat = new THREE.PointsMaterial({ color: 0xe8c890, size: 1.2, transparent: true, opacity: 0.45, depthAttenuation: true });
     var pts = new THREE.Points(geo, mat);
     scene.add(pts);
     dust.push(pts);
