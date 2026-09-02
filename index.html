@@ -5,373 +5,83 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Starship Landing" />
-<meta name="theme-color" content="#0c0a10" />
-<link rel="manifest" href="./manifest.webmanifest" />
-<title>STARSHIP · LANDING</title>
+<meta name="theme-color" content="#1a0e08" />
+<title>REDWAKE · Desert Pod Racer</title>
 <style>
-  :root {
-    --ink: #0c0a10;
-    --paper: #efe6d6;
-    --amber: #e8a23a;
-    --steel: #c5c8cc;
-    --teal: #7ec8c0;
-    --danger: #e85a4a;
-    --ok: #7dce7a;
-    --glass: rgba(10, 8, 14, 0.58);
-    --line: rgba(239, 230, 214, 0.14);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    width: 100%; height: 100%; overflow: hidden;
-    background: #0c0a10;
-    font-family: "Bahnschrift", "DIN Alternate", "Segoe UI", "Helvetica Neue", sans-serif;
-    color: var(--paper);
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-    overscroll-behavior: none;
-    -webkit-text-size-adjust: 100%;
-    -webkit-tap-highlight-color: transparent;
-  }
-  #c { display: block; width: 100%; height: 100%; }
-  .overlay {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    pointer-events: none; z-index: 6;
-  }
-  .panel {
-    pointer-events: auto;
-    width: min(640px, calc(100vw - 28px));
-    padding: 32px 34px 26px;
-    background: linear-gradient(180deg, rgba(16,12,18,0.82), rgba(10,8,12,0.9));
-    border: 1px solid var(--line);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
-  }
-  .kicker {
-    letter-spacing: 0.42em; font-size: 11px;
-    color: var(--amber); text-transform: uppercase; margin-bottom: 10px;
-  }
-  h1 {
-    font-weight: 600;
-    font-size: clamp(36px, 8vw, 64px);
-    letter-spacing: 0.06em; line-height: 0.92; text-transform: uppercase;
-  }
-  .tag { margin-top: 12px; font-size: 17px; color: rgba(239,230,214,0.78); }
-  .controls {
-    margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr;
-    gap: 6px 18px; font-size: 13px; color: rgba(239,230,214,0.7); line-height: 1.45;
-  }
-  .controls b { color: var(--paper); font-weight: 600; min-width: 88px; display: inline-block; }
-  .cta { margin-top: 26px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  .btn {
-    appearance: none; border: 0; background: var(--amber); color: #1a1206;
-    font: inherit; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
-    font-size: 13px; padding: 12px 22px; cursor: pointer;
-  }
-  .btn:hover { background: #f0b352; }
-  .hint { font-size: 12px; color: rgba(239,230,214,0.45); letter-spacing: 0.08em; text-transform: uppercase; }
-  #start { opacity: 1; transition: opacity 0.4s ease; }
-  #start.hide { opacity: 0; pointer-events: none; }
-  #end { display: none; }
-  #end.show { display: flex; }
-  .statrow { margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .stat { border-top: 1px solid var(--line); padding-top: 8px; }
-  .stat .lbl { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(239,230,214,0.45); }
-  .stat .val { font-size: 24px; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  #hud { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.35s; z-index: 3; }
-  #hud.on { opacity: 1; }
-  .hud-top {
-    position: absolute; top: max(10px, env(safe-area-inset-top));
-    left: max(12px, env(safe-area-inset-left));
-    right: max(12px, env(safe-area-inset-right));
-    display: flex; justify-content: space-between; align-items: flex-start;
-  }
-  .brand { letter-spacing: 0.3em; font-size: 11px; color: rgba(239,230,214,0.55); text-transform: uppercase; }
-  .best { text-align: right; font-size: 12px; color: rgba(239,230,214,0.55); font-variant-numeric: tabular-nums; }
-  .best strong { color: var(--amber); font-weight: 600; }
-  .instr {
-    position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    display: flex; gap: 8px 12px; align-items: stretch; flex-wrap: wrap;
-    background: var(--glass); border: 1px solid var(--line);
-    backdrop-filter: blur(10px); padding: 8px 12px 10px;
-    min-width: min(820px, calc(100vw - 28px)); justify-content: space-between;
-  }
-  .gauge { min-width: 72px; }
-  .gauge .lbl { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(239,230,214,0.42); }
-  .gauge .val { font-size: 22px; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; }
-  .gauge .unit { font-size: 10px; color: rgba(239,230,214,0.4); letter-spacing: 0.1em; }
-  .gauge.warn .val { color: var(--amber); }
-  .gauge.bad .val { color: var(--danger); }
-  .gauge.ok .val { color: var(--ok); }
-  .burn-flag {
-    position: absolute; top: 28%; left: 50%; transform: translateX(-50%);
-    letter-spacing: 0.46em; font-size: 18px; color: var(--amber);
-    text-transform: uppercase; opacity: 0; text-shadow: 0 0 18px rgba(232,162,58,0.65);
-  }
-  .burn-flag.on { opacity: 1; animation: pulse 0.4s ease-in-out infinite alternate; }
-  @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
-  #mutebadge {
-    position: absolute; top: max(14px, env(safe-area-inset-top)); left: 50%;
-    transform: translateX(-50%); font-size: 10px; letter-spacing: 0.24em;
-    text-transform: uppercase; color: rgba(239,230,214,0.4); display: none;
-  }
-  #mutebadge.on { display: block; }
-  #touch-ui { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 4; }
-  #touch-ui.on { display: block; }
-  #tilt-pad {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    width: 46vw;
-    height: 48vh;
-    border-radius: 0 72px 0 0;
-    background: linear-gradient(180deg, rgba(10, 8, 14, 0.08), rgba(10, 8, 14, 0.38));
-    border: 1px solid rgba(239, 230, 214, 0.16);
-    pointer-events: auto; touch-action: none;
-  }
-  #tilt-cross {
-    position: absolute; left: 50%; top: 54%;
-    width: min(168px, 36vw); height: min(168px, 36vw);
-    margin: calc(min(168px, 36vw) / -2) 0 0 calc(min(168px, 36vw) / -2);
-    border-radius: 50%;
-    border: 1px solid rgba(239,230,214,0.16);
-    pointer-events: none;
-  }
-  #tilt-cross:before, #tilt-cross:after {
-    content: ""; position: absolute; background: rgba(239,230,214,0.16); pointer-events: none;
-  }
-  #tilt-cross:before { left: 50%; top: 8%; bottom: 8%; width: 1px; margin-left: -0.5px; }
-  #tilt-cross:after { top: 50%; left: 8%; right: 8%; height: 1px; margin-top: -0.5px; }
-  #tilt-knob {
-    position: absolute; left: 50%; top: 50%; width: 52px; height: 52px;
-    margin: -26px 0 0 -26px; border-radius: 50%;
-    background: rgba(232, 162, 58, 0.55);
-    border: 1px solid rgba(239, 230, 214, 0.35); pointer-events: none;
-  }
-  #tilt-pad .touch-label {
-    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
-    font-size: 9px; letter-spacing: 0.2em; color: rgba(239,230,214,0.42);
-    text-transform: uppercase; pointer-events: none;
-  }
-  #thr-rail {
-    position: absolute;
-    right: max(14px, env(safe-area-inset-right));
-    top: 50%; margin-top: -130px;
-    width: 64px; height: min(260px, 52vh);
-    border-radius: 32px;
-    background: rgba(10, 8, 14, 0.42);
-    border: 1px solid rgba(239, 230, 214, 0.2);
-    pointer-events: auto; touch-action: none;
-  }
-  #thr-fill {
-    position: absolute; left: 7px; right: 7px; bottom: 7px; height: 0;
-    border-radius: 25px; background: rgba(232, 162, 58, 0.45); pointer-events: none;
-  }
-  #thr-knob {
-    position: absolute; left: 50%; width: 50px; height: 50px; margin-left: -25px;
-    border-radius: 50%; background: rgba(232, 162, 58, 0.9);
-    border: 1px solid rgba(239, 230, 214, 0.4); pointer-events: none; bottom: 6px;
-  }
-  #thr-rail .touch-label {
-    position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
-    font-size: 9px; letter-spacing: 0.16em; color: rgba(239,230,214,0.42);
-    text-transform: uppercase; pointer-events: none;
-  }
-  #touch-cluster {
-    position: absolute;
-    right: max(12px, env(safe-area-inset-right));
-    bottom: max(14px, env(safe-area-inset-bottom));
-    display: flex; flex-direction: column; gap: 8px; pointer-events: auto;
-  }
-  #touch-cluster button, #levelBtn {
-    appearance: none; border: 1px solid rgba(239,230,214,0.2);
-    background: rgba(10, 8, 14, 0.55); color: var(--paper);
-    font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
-    text-transform: uppercase; min-width: 88px; min-height: 46px; padding: 8px 10px;
-    cursor: pointer; touch-action: manipulation; pointer-events: auto;
-  }
-  #levelBtn {
-    display: none; position: absolute;
-    top: max(44px, calc(env(safe-area-inset-top) + 34px));
-    left: max(12px, env(safe-area-inset-left)); z-index: 5;
-  }
-  body.touch-on.phase-fly #levelBtn { display: inline-block; }
-  .mobile-hint { display: none; margin-top: 12px; font-size: 13px; color: var(--teal); line-height: 1.4; }
-  @media (pointer: coarse), (hover: none), (max-width: 900px) {
-    .mobile-hint { display: block; }
-    .btn { min-height: 52px; padding: 16px 26px; font-size: 15px; }
-    .panel { padding: 22px 16px 16px; }
-    h1 { font-size: clamp(28px, 9vw, 52px); }
-    .tag { font-size: 15px; }
-    .controls { font-size: 12px; margin-top: 16px; }
-    .instr { padding: 6px 8px 8px; min-width: 0; justify-content: center; }
-    .gauge { min-width: 48px; }
-    .gauge .val { font-size: 15px; }
-    .stat .val { font-size: 18px; }
-  }
-  @media (max-width: 900px) and (orientation: landscape) {
-    .instr { width: calc(100vw - 360px); max-width: calc(100vw - 360px); bottom: 10px; }
-    #thr-rail { top: 50%; margin-top: -110px; height: min(220px, 62vh); }
-  }
-  @media (max-width: 900px) and (orientation: portrait) {
-    .instr { width: calc(100vw - 16px); max-width: calc(100vw - 16px); bottom: 248px; }
-    #thr-rail { top: auto; bottom: 248px; margin-top: 0; }
-  }
-  @media (pointer: coarse), (hover: none), (max-width: 900px) {
-    #gTilt .val { font-size: 22px; }
-    #leanHud { font-size: 13px; }
-  }
+:root{--sand:#f4d9a8;--ochre:#c47a2c;--cyan:#7ecfff;--ink:#1a0e08}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a0e08;font-family:Bahnschrift,Segoe UI,sans-serif;color:var(--sand);user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+#c{display:block;width:100%;height:100%;position:absolute;inset:0;z-index:1}
+#hud{position:absolute;inset:0;z-index:5;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) 14px max(12px,env(safe-area-inset-bottom))}
+.top-bar{display:flex;justify-content:space-between;gap:10px}
+.stat{background:rgba(26,14,8,.55);border:1px solid rgba(244,217,168,.22);backdrop-filter:blur(8px);padding:8px 12px;border-radius:10px;min-width:72px}
+.stat .lbl{font-size:10px;letter-spacing:.18em;opacity:.7;text-transform:uppercase}
+.stat .val{font-size:22px;font-weight:700;color:#fff6e4}
+.tip{margin-top:8px;font-size:11px;background:rgba(26,14,8,.5);padding:6px 10px;border-radius:8px;border:1px solid rgba(126,207,255,.25);color:#cfefff;max-width:280px}
+.mid-msg{align-self:center;text-align:center;font-size:42px;font-weight:800;text-shadow:0 4px 24px rgba(0,0,0,.55);color:#fff;min-height:48px}
+.hbar{width:100px;height:10px;background:rgba(0,0,0,.35);border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.15);margin:0 auto 8px}
+.hbar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#ff9440,#ff5a3c)}
+.hbar.ok>i{background:linear-gradient(90deg,#6dff9a,#7ecfff)}
+#heatLbl{font-size:11px;opacity:.85;text-align:center;margin-bottom:4px}
+#Lrail,#Rrail{position:absolute;top:18%;bottom:22%;width:max(72px,18vw);max-width:110px;z-index:20;pointer-events:auto;touch-action:none;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.35));border:2px solid rgba(244,217,168,.55);border-radius:18px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+#Lrail{left:max(8px,env(safe-area-inset-left))}
+#Rrail{right:max(8px,env(safe-area-inset-right))}
+.rail-label{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:800;color:#fff6e4;pointer-events:none}
+.rail-track{position:absolute;left:50%;top:40px;bottom:16px;width:18px;transform:translateX(-50%);background:rgba(0,0,0,.45);border-radius:10px;pointer-events:none}
+.rail-fill{position:absolute;left:0;right:0;bottom:0;height:0%;background:linear-gradient(180deg,#ffd36a,#ff7a2a);border-radius:10px;pointer-events:none}
+.rail-knob{position:absolute;left:50%;width:42px;height:42px;transform:translate(-50%,50%);bottom:0%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff2cc,#e89020 55%,#8a4008);border:2px solid #fff6e4;pointer-events:none}
+#boostBtn{position:absolute;z-index:22;pointer-events:auto;touch-action:none;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);min-width:140px;height:56px;padding:0 22px;border-radius:28px;border:2px solid #ffe08a;background:linear-gradient(180deg,#ffb84a,#d86410);color:#1a0e08;font-weight:900;font-size:16px;letter-spacing:.18em}
+#boostBtn.active{background:linear-gradient(180deg,#fff0a8,#ff7a20);transform:translateX(-50%) scale(1.05)}
+#zoneL,#zoneR{position:absolute;top:0;bottom:0;width:50%;z-index:8;pointer-events:auto;touch-action:none}
+#zoneL{left:0}#zoneR{right:0}
+.overlay{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(40,22,10,.72),rgba(10,6,4,.88));pointer-events:auto}
+.overlay.hidden{display:none}
+.panel{width:min(440px,calc(100vw - 28px));padding:28px 26px 22px;background:linear-gradient(180deg,rgba(60,34,16,.92),rgba(26,14,8,.95));border:1px solid rgba(244,217,168,.28);border-radius:16px;text-align:center}
+.kicker{letter-spacing:.36em;font-size:11px;color:#ffb84a;text-transform:uppercase;margin-bottom:8px}
+h1{font-size:36px;font-weight:900;color:#fff6e4;margin-bottom:8px}
+.blurb{font-size:14px;line-height:1.45;margin-bottom:16px;color:#f0d8b0}
+.blurb strong{color:#7ecfff}
+button.cta{display:inline-block;margin:6px 4px;min-width:140px;height:48px;padding:0 20px;border-radius:12px;border:0;background:linear-gradient(180deg,#ffc65a,#e07018);color:#1a0e08;font-weight:900;font-size:15px;cursor:pointer}
+button.cta.ghost{background:transparent;border:1px solid rgba(244,217,168,.35);color:var(--sand)}
+.result{font-size:18px;margin:10px 0 14px;color:#fff}
 
-  #leanHud {
-    position: absolute;
-    top: max(36px, calc(env(safe-area-inset-top) + 26px));
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 15px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #efe6d6;
-    background: rgba(10, 8, 14, 0.62);
-    border: 1px solid rgba(239,230,214,0.28);
-    padding: 6px 12px;
-    font-variant-numeric: tabular-nums;
-    pointer-events: none;
-    z-index: 5;
-    white-space: nowrap;
-  }
-  #gTilt { min-width: 92px; }
-  #gTilt .val { font-size: 26px; }
-  #dir-pad {
-    position: absolute;
-    left: max(10px, env(safe-area-inset-left));
-    bottom: max(16px, env(safe-area-inset-bottom));
-    width: 228px;
-    height: 228px;
-    display: grid;
-    grid-template-columns: 72px 72px 72px;
-    grid-template-rows: 72px 72px 72px;
-    gap: 6px;
-    pointer-events: auto;
-    z-index: 8;
-  }
-  #dir-fwd { grid-column: 2; grid-row: 1; }
-  #dir-left { grid-column: 1; grid-row: 2; }
-  #dir-right { grid-column: 3; grid-row: 2; }
-  #dir-back { grid-column: 2; grid-row: 3; }
-  #dir-pad button {
-    width: 72px;
-    height: 72px;
-    min-width: 68px;
-    min-height: 68px;
-    appearance: none;
-    border: 1px solid rgba(255,255,255,0.45);
-    background: rgba(12, 10, 16, 0.85);
-    color: #ffffff;
-    font: inherit;
-    font-size: 30px;
-    font-weight: 700;
-    line-height: 1;
-    border-radius: 12px;
-    pointer-events: auto;
-    touch-action: none;
-    opacity: 0.85;
-    cursor: pointer;
-  }
-  #dir-pad button:active { opacity: 1; background: rgba(232, 162, 58, 0.85); color: #1a1206; }
-  #tilt-cross { top: 34%; }
-
-  #fail {
-    display: none; position: absolute; inset: 0; align-items: center; justify-content: center;
-    background: #0c0a10; color: #c8d0d8; padding: 40px; text-align: center; z-index: 10;
-  }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="fail"></div>
+<div id="zoneL" aria-hidden="true"></div>
+<div id="zoneR" aria-hidden="true"></div>
+<div id="Lrail"><div class="rail-label">L</div><div class="rail-track"><div class="rail-fill" id="Lfill"></div></div><div class="rail-knob" id="Lknob"></div></div>
+<div id="Rrail"><div class="rail-label">R</div><div class="rail-track"><div class="rail-fill" id="Rfill"></div></div><div class="rail-knob" id="Rknob"></div></div>
+<button id="boostBtn" type="button">BOOST</button>
 <div id="hud">
-  <div class="hud-top">
-    <div class="brand">Starship · Landing</div>
-    <div class="best">BEST <strong id="bestV">—</strong></div>
+  <div class="top-bar">
+    <div class="stat"><div class="lbl">Speed</div><div class="val" id="spd">0</div></div>
+    <div class="stat"><div class="lbl">Lap</div><div class="val" id="lap">1/3</div></div>
+    <div class="stat"><div class="lbl">Place</div><div class="val" id="plc">—</div></div>
   </div>
-  <button type="button" id="levelBtn">Level</button>
-  <div id="mutebadge">Audio muted</div>
-  <div id="leanHud">LEAN  L/R 0°  F/B 0°</div>
-  <div class="burn-flag" id="burnFlag">Burn</div>
-  <div class="instr">
-    <div class="gauge" id="gAlt"><div class="lbl">Alt</div><div class="val" id="alt">—</div><div class="unit">M AGL</div></div>
-    <div class="gauge" id="gVs"><div class="lbl">V-Speed</div><div class="val" id="vs">—</div><div class="unit">M/S</div></div>
-    <div class="gauge" id="gHs"><div class="lbl">H-Speed</div><div class="val" id="hs">—</div><div class="unit">M/S</div></div>
-    <div class="gauge" id="gTilt"><div class="lbl">Att</div><div class="val" id="tilt">—</div><div class="unit">DEG</div></div>
-    <div class="gauge" id="gThr"><div class="lbl">Throttle</div><div class="val" id="thr">—</div><div class="unit">PERCENT</div></div>
-    <div class="gauge" id="gFuel"><div class="lbl">Fuel</div><div class="val" id="fuel">—</div><div class="unit">T · %</div></div>
-    <div class="gauge" id="gTwr"><div class="lbl">TWR</div><div class="val" id="twr">—</div><div class="unit">THRUST</div></div>
-  </div>
+  <div class="tip">More LEFT thrust → turn RIGHT · split at low speed = spin risk</div>
+  <div class="mid-msg" id="msg"></div>
+  <div><div id="heatLbl">HEAT</div><div class="hbar ok" id="heatBar"><i id="heatFill"></i></div></div>
 </div>
-<div class="overlay" id="start">
+<div class="overlay" id="startOv">
   <div class="panel">
-    <div class="kicker">Hot Fire · Boca Chica</div>
-    <h1>Starship<br/>Landing</h1>
-    <div class="tag">Kill the speed. Hit the steel.</div>
-    <div class="mobile-hint">Arrow pad leans the stack. Right rail is throttle. Level enables phone tilt. First tap drops you.</div>
-    <div class="controls">
-      <div><b>W / S</b> Pitch</div>
-      <div><b>A / D</b> Lean</div>
-      <div><b>Shift / Ctrl</b> Throttle</div>
-      <div><b>Wheel</b> Throttle</div>
-      <div><b>Space</b> Relight</div>
-      <div><b>M</b> Mute</div>
-    </div>
-    <div class="cta">
-      <button class="btn" id="flyBtn" type="button" onclick="if(window.startDrop)window.startDrop(event)">Drop</button>
-      <div class="hint">Tap or press any key</div>
-    </div>
+    <div class="kicker">Canyon Circuit · Original Fantasy</div>
+    <h1>REDWAKE</h1>
+    <p class="blurb">Twin ramjets on energy tethers. Cockpit between them. <strong>Steer with differential thrust</strong> — more left thrust yaws right. Fat L/R rails (or screen halves). Hold BOOST. 3 laps.</p>
+    <button class="cta" type="button" id="btnStart" onclick="window.startRace()">START RACE</button>
   </div>
 </div>
-<div class="overlay" id="end">
+<div class="overlay hidden" id="endOv">
   <div class="panel">
-    <div class="kicker" id="endKicker">Flight ended</div>
-    <h1 id="endTitle">RUD.</h1>
-    <div class="tag" id="endTag">The Gulf keeps what you give it.</div>
-    <div class="statrow">
-      <div class="stat"><div class="lbl">Contact</div><div class="val" id="eV">—</div></div>
-      <div class="stat"><div class="lbl">Tilt</div><div class="val" id="eTilt">—</div></div>
-      <div class="stat"><div class="lbl">Fuel</div><div class="val" id="eFuel">—</div></div>
-    </div>
-    <div class="cta">
-      <button class="btn" id="reBtn" type="button" onclick="if(window.startDrop)window.startDrop(event)">Relight</button>
-      <div class="hint">Space to fly again</div>
-    </div>
+    <div class="kicker" id="endKick">Finish</div>
+    <h1 id="endTitle">DONE</h1>
+    <p class="result" id="endResult"></p>
+    <button class="cta" type="button" id="btnRetry" onclick="window.retryRace()">RETRY</button>
+    <button class="cta ghost" type="button" id="btnRestart" onclick="window.startRace()">RESTART</button>
   </div>
 </div>
-<div id="touch-ui" aria-hidden="true">
-  <div id="dir-pad">
-    <button type="button" id="dir-fwd" aria-label="Forward">↑</button>
-    <button type="button" id="dir-left" aria-label="Left">←</button>
-    <button type="button" id="dir-right" aria-label="Right">→</button>
-    <button type="button" id="dir-back" aria-label="Back">↓</button>
-  </div>
-  <div id="tilt-pad">
-    <div id="tilt-cross"></div>
-    <div id="tilt-knob"></div>
-    <div class="touch-label">Lean</div>
-  </div>
-  <div id="thr-rail">
-    <div id="thr-fill"></div>
-    <div id="thr-knob"></div>
-    <div class="touch-label">Thr</div>
-  </div>
-  <div id="touch-cluster">
-    <button type="button" id="touch-relaunch">Again</button>
-    <button type="button" id="touch-mute">Mute</button>
-  </div>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
-<script src="sl-game.js?v=a91c2d"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="redwake.js?v=69a57b"></script>
 </body>
 </html>
