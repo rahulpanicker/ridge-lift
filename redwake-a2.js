@@ -144,4 +144,74 @@
     this.engVelR = new THREE.Vector3();
   }
 
-  Pod.prototype.resetAt = func
+  Pod.prototype.resetAt = function (idx, lateral) {
+    var p = centerline[idx].clone();
+    var b = binormals[idx];
+    var tan = tangents[idx];
+    p.addScaledVector(b, lateral || 0);
+    p.y += HOVER_H;
+    this.pos.copy(p);
+    this.vel.set(0, 0, 0);
+    this.yaw = Math.atan2(tan.x, tan.z);
+    this.yawRate = 0;
+    this.roll = 0;
+    this.throttleL = this.throttleR = 0;
+    this.spoolL = this.spoolR = 0;
+    this.boost = BOOST_MAX;
+    this.boosting = false;
+    this.heat = 0;
+    this.alive = true;
+    this.finished = false;
+    this.lap = 1;
+    this.cp = 0;
+    this.progress = idx / NSEG;
+    this.raceProg = 0;
+    this.engOffsetL.set(-TETHER_LEN, 0, 0);
+    this.engOffsetR.set(TETHER_LEN, 0, 0);
+    this.engVelL.set(0, 0, 0);
+    this.engVelR.set(0, 0, 0);
+    this.syncVisual();
+  };
+
+  Pod.prototype.forward = function () {
+    return new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+  };
+  Pod.prototype.right = function () {
+    return new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+  };
+
+  Pod.prototype.syncVisual = function () {
+    var fwd = this.forward();
+    var rgt = this.right();
+    this.cockpit.position.copy(this.pos);
+    this.cockpit.rotation.set(0, this.yaw, this.roll);
+    var worldL = this.pos.clone().add(rgt.clone().multiplyScalar(this.engOffsetL.x)).add(new THREE.Vector3(0, this.engOffsetL.y, 0));
+    var worldR = this.pos.clone().add(rgt.clone().multiplyScalar(this.engOffsetR.x)).add(new THREE.Vector3(0, this.engOffsetR.y, 0));
+    // also allow slight fore-aft from engOffset z if any
+    worldL.add(fwd.clone().multiplyScalar(this.engOffsetL.z || 0));
+    worldR.add(fwd.clone().multiplyScalar(this.engOffsetR.z || 0));
+    this.engL.position.copy(worldL);
+    this.engR.position.copy(worldR);
+    this.engL.rotation.set(0, this.yaw, this.roll * 0.5);
+    this.engR.rotation.set(0, this.yaw, this.roll * 0.5);
+    // tethers
+    placeTether(this.tetherL, this.pos, worldL);
+    placeTether(this.tetherR, this.pos, worldR);
+    // afterburner
+    var fl = 0.3 + this.spoolL * (this.boosting ? 1.4 : 1) * 1.2;
+    var fr = 0.3 + this.spoolR * (this.boosting ? 1.4 : 1) * 1.2;
+    this.engL.userData.cone.scale.set(1, 1, fl);
+    this.engR.userData.cone.scale.set(1, 1, fr);
+    this.engL.userData.cone.material.opacity = 0.4 + this.spoolL * 0.6;
+    this.engR.userData.cone.material.opacity = 0.4 + this.spoolR * 0.6;
+    this.engL.userData.glow.material.emissiveIntensity = 1.0 + this.spoolL * 1.6;
+    this.engR.userData.glow.material.emissiveIntensity = 1.0 + this.spoolR * 1.6;
+  };
+
+  function placeTether(mesh, a, b) {
+    var mid = a.clone().add(b).multiplyScalar(0.5);
+    var dir = b.clone().sub(a);
+    var len = dir.length();
+    mesh.position.copy(mid);
+    mesh.scale.set(1, len, 1);
+    mesh.
