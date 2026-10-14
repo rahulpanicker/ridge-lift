@@ -1,5 +1,5 @@
 (function(){
-  var files=["redwake-a1.js?v=d4e91a","redwake-a2.js?v=d4e91a","redwake-a3.js?v=d4e91a","redwake-a4.js?v=d4e91a"];
+  var files=["redwake-a1.js?v=71cc71","redwake-a2.js?v=71cc71","redwake-a3.js?v=71cc71","redwake-a4.js?v=71cc71"];
   var acc="", i=0;
   function step(){
     if(i>=files.length){
