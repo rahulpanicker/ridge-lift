@@ -1,28 +1,80 @@
-    var postL = new THREE.Mesh(new THREE.BoxGeometry(1.2, 14, 1.2), gateMat);
+      fidx.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1);
+    }
+    var floorGeo = new THREE.BufferGeometry();
+    floorGeo.setAttribute("position", new THREE.Float32BufferAttribute(fv, 3));
+    floorGeo.setAttribute("uv", new THREE.Float32BufferAttribute(fuv, 2));
+    floorGeo.setIndex(fidx);
+    floorGeo.computeVertexNormals();
+    var floorMesh = new THREE.Mesh(
+      floorGeo,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, map: sandTex, roughness: 0.9, metalness: 0.02,
+        emissive: 0x332200, emissiveIntensity: 0.08
+      })
+    );
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // dashed racing line / chevron markers along centerline
+    var dashMat = new THREE.MeshBasicMaterial({ color: 0xfff6d0 });
+    var chevMat = new THREE.MeshBasicMaterial({ color: 0xffcc44 });
+    for (i = 0; i < NSEG; i += 3) {
+      p = centerline[i];
+      var tan = tangents[i];
+      var dash = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.12, 2.4), dashMat);
+      dash.position.copy(p).add(new THREE.Vector3(0, 0.18, 0));
+      dash.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tan.clone().normalize());
+      scene.add(dash);
+      if (i % 6 === 0) {
+        var chev = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.6, 3), chevMat);
+        chev.position.copy(p).add(new THREE.Vector3(0, 0.22, 0));
+        chev.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan.clone().normalize());
+        chev.rotateX(Math.PI / 2);
+        scene.add(chev);
+      }
+    }
+
+    // start gate
+    var sp = centerline[0];
+    var sb = binormals[0];
+    var gateMat = new THREE.MeshStandardMaterial({ color: 0xffd878, emissive: 0xff8800, emissiveIntensity: 0.85 });
+    var postL = new THREE.Mesh(new THREE.BoxGeometry(1.2, 16, 1.2), gateMat);
     var postR = postL.clone();
-    postL.position.copy(sp).addScaledVector(sb, -widths[0] + 2).add(new THREE.Vector3(0, 7, 0));
-    postR.position.copy(sp).addScaledVector(sb, widths[0] - 2).add(new THREE.Vector3(0, 7, 0));
+    postL.position.copy(sp).addScaledVector(sb, -widths[0] + 2).add(new THREE.Vector3(0, 8, 0));
+    postR.position.copy(sp).addScaledVector(sb, widths[0] - 2).add(new THREE.Vector3(0, 8, 0));
     scene.add(postL, postR);
     var beam = new THREE.Mesh(new THREE.BoxGeometry(widths[0] * 2 - 2, 0.8, 0.8), gateMat);
-    beam.position.copy(sp).add(new THREE.Vector3(0, 14, 0));
+    beam.position.copy(sp).add(new THREE.Vector3(0, 16, 0));
     scene.add(beam);
 
-    // distant purple cliffs billboard boxes
-    for (i = 0; i < 24; i++) {
-      var ang = (i / 24) * Math.PI * 2;
-      var rad = 420 + (i % 5) * 40;
-      var cliff = new THREE.Mesh(
-        new THREE.BoxGeometry(40 + (i % 3) * 20, 80 + (i % 4) * 30, 30),
-        new THREE.MeshStandardMaterial({ color: 0x8a6a9a, roughness: 0.9, emissive: 0x110022, emissiveIntensity: 0.04 })
+    // scenery: mesas + spires OUTSIDE the canyon (no collision)
+    var rockCols = [0xc9773f, 0xd89a5c, 0xb8603a, 0xe0b07a, 0xa86a4a, 0x9a7aa0];
+    var placed = 0, tries = 0;
+    while (placed < 46 && tries < 600) {
+      tries++;
+      var ang2 = Math.random() * Math.PI * 2, rad2 = 120 + Math.random() * 700;
+      var px = Math.cos(ang2) * rad2, pz = Math.sin(ang2) * rad2 - 80;
+      var pp = new THREE.Vector3(px, 0, pz);
+      var ni = nearestTrack(pp), clr = widths[ni] + 45;
+      if (pp.distanceTo(new THREE.Vector3(centerline[ni].x, 0, centerline[ni].z)) < clr) continue;
+      var spire = Math.random() < 0.45;
+      var hgt = spire ? 40 + Math.random() * 70 : 25 + Math.random() * 50;
+      var rTop = spire ? 2 + Math.random() * 4 : 20 + Math.random() * 30;
+      var rBot = spire ? 8 + Math.random() * 8 : rTop * 1.25;
+      var rock = new THREE.Mesh(
+        new THREE.CylinderGeometry(rTop, rBot, hgt, spire ? 7 : 9, 1),
+        new THREE.MeshStandardMaterial({ color: rockCols[placed % rockCols.length], map: strataTex, roughness: 0.9, flatShading: true })
       );
-      cliff.position.set(Math.cos(ang) * rad, 20, Math.sin(ang) * rad);
-      scene.add(cliff);
+      rock.position.set(px, hgt / 2 - 2, pz);
+      rock.rotation.y = Math.random() * 6;
+      scene.add(rock);
+      placed++;
     }
 
     // sky ground plane far
     var ground = new THREE.Mesh(
-      new THREE.CircleGeometry(900, 48),
-      new THREE.MeshStandardMaterial({ color: 0xe8c878, roughness: 1, emissive: 0x221100, emissiveIntensity: 0.04 })
+      new THREE.CircleGeometry(2000, 48),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: (function(){ var t = sandTex.clone(); t.repeat.set(160, 160); t.needsUpdate = true; return t; })(), roughness: 1, emissive: 0x221100, emissiveIntensity: 0.04 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -2;
@@ -218,66 +270,3 @@
     mesh.material.opacity = 0.75 + Math.min(0.25, Math.abs(len - TETHER_LEN) * 0.15);
   }
 
-  Pod.prototype.step = function (dt) {
-    if (!this.alive || this.finished) { this.syncVisual(); return; }
-    var soft = this.soft;
-    // spool
-    var tgtL = this.throttleL, tgtR = this.throttleR;
-    // heat sag near 100%
-    var sag = this.heat > 0.85 ? (1 - (this.heat - 0.85) * 1.5) : 1;
-    sag = Math.max(0.35, sag);
-    var tau = SPOOL_TAU * soft;
-    this.spoolL += (tgtL * sag - this.spoolL) * (1 - Math.exp(-dt / tau));
-    this.spoolR += (tgtR * sag - this.spoolR) * (1 - Math.exp(-dt / tau));
-
-    var boostMul = 1;
-    if (this.boosting && this.boost > 0 && this.heat < 0.98) {
-      boostMul = BOOST_MULT;
-      this.boost = Math.max(0, this.boost - dt);
-      this.heat = Math.min(1, this.heat + HEAT_RATE * 1.4 * dt);
-      if (this.boost <= 0) this.boosting = false;
-    } else {
-      this.boosting = false;
-      this.boost = Math.min(BOOST_MAX, this.boost + dt * 0.35);
-    }
-    var thrustUse = (this.spoolL + this.spoolR) * 0.5;
-    this.heat = Math.min(1, Math.max(0, this.heat + (thrustUse > 0.85 ? HEAT_RATE : -COOL_RATE) * dt));
-
-    var fwd = this.forward();
-    var rgt = this.right();
-    var fL = this.spoolL * FMAX * boostMul / soft;
-    var fR = this.spoolR * FMAX * boostMul / soft;
-
-    // Forces on engines along forward; yaw from differential
-    // Convention: MORE LEFT thrust → turn RIGHT (engines push, left-heavy yaws CW when looking down = +yaw if yaw from +z toward +x)
-    var totalF = fL + fR;
-    var diff = fL - fR; // +diff => more left => yaw right (+)
-    var force = fwd.clone().multiplyScalar(totalF);
-
-    // drag
-    var spd = this.vel.length();
-    var sideslip = 0;
-    if (spd > 0.5) {
-      var vdir = this.vel.clone().normalize();
-      sideslip = 1 - Math.abs(vdir.dot(fwd));
-    }
-    var Cd = CD0 * (1 + 1.8 * sideslip + 0.6 * Math.abs(this.yawRate));
-    if (spd > 0.01) {
-      var dragMag = 0.5 * RHO * Cd * AREA * spd * spd;
-      force.add(this.vel.clone().normalize().multiplyScalar(-dragMag));
-    }
-
-    // mass = cockpit + engines coupled loosely
-    var mass = MASS_COCKPIT + MASS_ENGINE * 2;
-    var acc = force.multiplyScalar(1 / mass);
-    this.vel.addScaledVector(acc, dt);
-
-    // yaw dynamics from differential thrust + lever arm
-    var yawTorque = diff * TETHER_LEN * 0.55;
-    var I = MASS_ENGINE * TETHER_LEN * TETHER_LEN * 2 + MASS_COCKPIT * 1.5;
-    this.yawRate += (yawTorque / I) * dt;
-    // yaw damping
-    this.yawRate *= Math.exp(-1.8 * dt);
-    // low-speed scissor amplification when huge split
-    var split = Math.abs(this.spoolL - this.spoolR);
-    if (spd < 25 && split > 0.35) {
