@@ -1,3 +1,62 @@
+    if (!anyPtr && !(k.KeyW || k.KeyS || k.KeyA || k.KeyD || k.ArrowUp || k.ArrowDown || k.ArrowLeft || k.ArrowRight)) {
+      // leave touch values; if never touched stay 0
+    }
+    if (!anyPtr && (k.KeyW || k.KeyA || k.KeyD || k.KeyS || k.ArrowUp || k.ArrowDown || k.ArrowLeft || k.ArrowRight)) {
+      setRailVisual("L", input.L);
+      setRailVisual("R", input.R);
+    }
+    if (!(k.ShiftLeft || k.ShiftRight) && !boostBtn.classList.contains("active")) {
+      // don't force false if button held — button sets input.boost
+      if (!boostHeld) input.boost = false;
+    }
+  }
+  var boostHeld = false;
+  boostBtn.addEventListener("pointerdown", function () { boostHeld = true; });
+  boostBtn.addEventListener("pointerup", function () { boostHeld = false; });
+
+  // ========== AUDIO ==========
+  var audioCtx = null, rumble = null;
+  function unlockAudio() {
+    if (audioCtx) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      var filt = audioCtx.createBiquadFilter();
+      filt.type = "lowpass"; filt.frequency.value = 120;
+      gain.gain.value = 0.0001;
+      osc.type = "sawtooth"; osc.frequency.value = 55;
+      osc.connect(filt); filt.connect(gain); gain.connect(audioCtx.destination);
+      osc.start();
+      rumble = { osc: osc, gain: gain, filt: filt };
+    } catch (err) {}
+  }
+  function updateAudio(thrust) {
+    if (!rumble || !audioCtx) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    rumble.gain.gain.setTargetAtTime(0.0001 + thrust * 0.035, audioCtx.currentTime, 0.05);
+    rumble.osc.frequency.setTargetAtTime(45 + thrust * 70, audioCtx.currentTime, 0.08);
+  }
+
+  // ========== GAME STATE ==========
+  var player = new Pod({ isPlayer: true, name: "Redwake", color: 0xff4422, engColor: 0xff7722 });
+  var ai1 = new Pod({ name: "Saffron", color: 0x33bbff, engColor: 0x22a0ff, soft: 1.15 });
+  var ai2 = new Pod({ name: "Cinder", color: 0x44ee55, engColor: 0x22cc44, soft: 1.2 });
+  var pods = [player, ai1, ai2];
+  var state = "title"; // title | countdown | racing | done
+  var countdown = 0;
+  var raceTime = 0;
+  var camPos = new THREE.Vector3(0, 10, 20);
+  var camLook = new THREE.Vector3();
+  var dust = [];
+
+  // dust particles
+  (function () {
+    var geo = new THREE.BufferGeometry();
+    var N = 400;
+    var pos = new Float32Array(N * 3);
+    for (var i = 0; i < N; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 400;
       pos[i * 3 + 1] = Math.random() * 12 + 1;
       pos[i * 3 + 2] = (Math.random() - 0.5) * 400;
     }
