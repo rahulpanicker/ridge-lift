@@ -1,3 +1,66 @@
+  Pod.prototype.step = function (dt) {
+    if (!this.alive || this.finished) { this.syncVisual(); return; }
+    var soft = this.soft;
+    // spool
+    var tgtL = this.throttleL, tgtR = this.throttleR;
+    // heat sag near 100%
+    var sag = this.heat > 0.85 ? (1 - (this.heat - 0.85) * 1.5) : 1;
+    sag = Math.max(0.35, sag);
+    var tau = SPOOL_TAU * soft;
+    this.spoolL += (tgtL * sag - this.spoolL) * (1 - Math.exp(-dt / tau));
+    this.spoolR += (tgtR * sag - this.spoolR) * (1 - Math.exp(-dt / tau));
+
+    var boostMul = 1;
+    if (this.boosting && this.boost > 0 && this.heat < 0.98) {
+      boostMul = BOOST_MULT;
+      this.boost = Math.max(0, this.boost - dt);
+      this.heat = Math.min(1, this.heat + HEAT_RATE * 1.4 * dt);
+      if (this.boost <= 0) this.boosting = false;
+    } else {
+      this.boosting = false;
+      this.boost = Math.min(BOOST_MAX, this.boost + dt * 0.35);
+    }
+    var thrustUse = (this.spoolL + this.spoolR) * 0.5;
+    this.heat = Math.min(1, Math.max(0, this.heat + (thrustUse > 0.85 ? HEAT_RATE : -COOL_RATE) * dt));
+
+    var fwd = this.forward();
+    var rgt = this.right();
+    var fL = this.spoolL * FMAX * boostMul / soft;
+    var fR = this.spoolR * FMAX * boostMul / soft;
+
+    // Forces on engines along forward; yaw from differential
+    // Convention: MORE LEFT thrust → turn RIGHT (engines push, left-heavy yaws CW when looking down = +yaw if yaw from +z toward +x)
+    var totalF = fL + fR;
+    var diff = fL - fR; // +diff => more left => yaw right (+)
+    var force = fwd.clone().multiplyScalar(totalF);
+
+    // drag
+    var spd = this.vel.length();
+    var sideslip = 0;
+    if (spd > 0.5) {
+      var vdir = this.vel.clone().normalize();
+      sideslip = 1 - Math.abs(vdir.dot(fwd));
+    }
+    var Cd = CD0 * (1 + 1.8 * sideslip + 0.6 * Math.abs(this.yawRate));
+    if (spd > 0.01) {
+      var dragMag = 0.5 * RHO * Cd * AREA * spd * spd;
+      force.add(this.vel.clone().normalize().multiplyScalar(-dragMag));
+    }
+
+    // mass = cockpit + engines coupled loosely
+    var mass = MASS_COCKPIT + MASS_ENGINE * 2;
+    var acc = force.multiplyScalar(1 / mass);
+    this.vel.addScaledVector(acc, dt);
+
+    // yaw dynamics from differential thrust + lever arm
+    var yawTorque = diff * TETHER_LEN * 0.55;
+    var I = MASS_ENGINE * TETHER_LEN * TETHER_LEN * 2 + MASS_COCKPIT * 1.5;
+    this.yawRate += (yawTorque / I) * dt;
+    // yaw damping
+    this.yawRate *= Math.exp(-1.8 * dt);
+    // low-speed scissor amplification when huge split
+    var split = Math.abs(this.spoolL - this.spoolR);
+    if (spd < 25 && split > 0.35) {
       this.yawRate += (this.spoolL - this.spoolR) * 2.8 * dt;
       // tether stretch dump speed
       this.vel.multiplyScalar(Math.max(0.92, 1 - split * 0.04));
@@ -51,18 +114,11 @@
       this.pos.addScaledVector(b, -sign * pen);
       // bounce
       var vLat = this.vel.dot(b);
-      if (vLat * sign > 0) this.vel.addScaledVector(b, -vLat * 1.35);
-      this.vel.multiplyScalar(0.72);
-      this.yawRate += -sign * 1.5;
+      if (vLat * sign > 0) this.vel.addScaledVector(b, -vLat * 1.15);
+      this.vel.multiplyScalar(0.93);
+      this.yawRate += -sign * 0.6;
       this.sparkT = 0.35;
-      this.heat = Math.min(1, this.heat + 0.08);
-      if (pen > 4 || this.vel.length() < 4 && pen > 1.5) {
-        // hard hit DNF if slamming deep
-        if (spd > 55 && pen > 3.5) {
-          this.alive = false;
-          this.vel.multiplyScalar(0.1);
-        }
-      }
+      this.heat = Math.min(1, this.heat + 0.03);
     }
 
     // keep roughly on track heading assist very light for AI only handled outside
@@ -202,62 +258,3 @@
     // if no keys and no pointers, don't zero — touch may hold
     var anyPtr = false;
     for (var p in railPointers) { anyPtr = true; break; }
-    if (!anyPtr && !(k.KeyW || k.KeyS || k.KeyA || k.KeyD || k.ArrowUp || k.ArrowDown || k.ArrowLeft || k.ArrowRight)) {
-      // leave touch values; if never touched stay 0
-    }
-    if (!anyPtr && (k.KeyW || k.KeyA || k.KeyD || k.KeyS || k.ArrowUp || k.ArrowDown || k.ArrowLeft || k.ArrowRight)) {
-      setRailVisual("L", input.L);
-      setRailVisual("R", input.R);
-    }
-    if (!(k.ShiftLeft || k.ShiftRight) && !boostBtn.classList.contains("active")) {
-      // don't force false if button held — button sets input.boost
-      if (!boostHeld) input.boost = false;
-    }
-  }
-  var boostHeld = false;
-  boostBtn.addEventListener("pointerdown", function () { boostHeld = true; });
-  boostBtn.addEventListener("pointerup", function () { boostHeld = false; });
-
-  // ========== AUDIO ==========
-  var audioCtx = null, rumble = null;
-  function unlockAudio() {
-    if (audioCtx) return;
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      var osc = audioCtx.createOscillator();
-      var gain = audioCtx.createGain();
-      var filt = audioCtx.createBiquadFilter();
-      filt.type = "lowpass"; filt.frequency.value = 120;
-      gain.gain.value = 0.0001;
-      osc.type = "sawtooth"; osc.frequency.value = 55;
-      osc.connect(filt); filt.connect(gain); gain.connect(audioCtx.destination);
-      osc.start();
-      rumble = { osc: osc, gain: gain, filt: filt };
-    } catch (err) {}
-  }
-  function updateAudio(thrust) {
-    if (!rumble || !audioCtx) return;
-    if (audioCtx.state === "suspended") audioCtx.resume();
-    rumble.gain.gain.setTargetAtTime(0.0001 + thrust * 0.035, audioCtx.currentTime, 0.05);
-    rumble.osc.frequency.setTargetAtTime(45 + thrust * 70, audioCtx.currentTime, 0.08);
-  }
-
-  // ========== GAME STATE ==========
-  var player = new Pod({ isPlayer: true, name: "Redwake", color: 0xff4422, engColor: 0xff7722 });
-  var ai1 = new Pod({ name: "Saffron", color: 0x33bbff, engColor: 0x22a0ff, soft: 1.15 });
-  var ai2 = new Pod({ name: "Cinder", color: 0x44ee55, engColor: 0x22cc44, soft: 1.2 });
-  var pods = [player, ai1, ai2];
-  var state = "title"; // title | countdown | racing | done
-  var countdown = 0;
-  var raceTime = 0;
-  var camPos = new THREE.Vector3(0, 10, 20);
-  var camLook = new THREE.Vector3();
-  var dust = [];
-
-  // dust particles
-  (function () {
-    var geo = new THREE.BufferGeometry();
-    var N = 400;
-    var pos = new Float32Array(N * 3);
-    for (var i = 0; i < N; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 400;
